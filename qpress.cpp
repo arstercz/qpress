@@ -92,6 +92,9 @@ and finally outputs an UPDIR:
 #include "aio.hpp"
 #include <stdarg.h>
 #include <string>
+#include <unistd.h>
+#include <errno.h>
+#include <string.h>
 #include "levels.c"
 #include "utilities.hpp"
 
@@ -117,15 +120,15 @@ using namespace std;
 #endif
 
 #ifdef WINDOWS
-	#define CURDIR ".\\"
+    #define CURDIR ".\\"
     #define DELIM_STR "\\"
     #define DELIM_CHAR '\\'
     #define LONGLONG "%I64d"
-	#ifndef PROCESS_MODE_BACKGROUND_BEGIN
-	    #define PROCESS_MODE_BACKGROUND_BEGIN   0x00100000
+    #ifndef PROCESS_MODE_BACKGROUND_BEGIN
+        #define PROCESS_MODE_BACKGROUND_BEGIN   0x00100000
     #endif
 #else
-	#define CURDIR "./"
+    #define CURDIR "./"
     #define DELIM_STR "/"
     #define DELIM_CHAR '/'
     #define LONGLONG "%lld"
@@ -145,6 +148,7 @@ bool recursive_flag = false;
 bool decompress_flag = false;
 bool recover_flag = false;
 bool benchmark_flag = false;
+bool delete_flag = false;
 unsigned long long compress_chunk_size = DEFAULT_COMPRESS_CHUNK_SIZE;
 unsigned int compression_level = DEFAULT_COMPRESSION_LEVEL;
 unsigned int threads = DEFAULT_THREAD_COUNT;
@@ -260,7 +264,7 @@ void parse_flags(int argc, char* argv[])
         size_t o = 0;
 
         flags_exist = true;
-        size_t e = arg[1].find_first_not_of("-iodrvcmRfKCBPLT0123456789");
+        size_t e = arg[1].find_first_not_of("-inodrvcmRfKCBPLT0123456789");
         if(e != string::npos)
             abort("Unknown flag -%s", arg[1].substr(e, 1).c_str());
 
@@ -286,6 +290,7 @@ void parse_flags(int argc, char* argv[])
         cache_flag = arg[1].find_first_of("B") != string::npos ? false : true;
         input_pipe = arg[1].find_first_of("i") != string::npos ? true : false;
         output_pipe = arg[1].find_first_of("o") != string::npos ? true : false;
+        delete_flag = arg[1].find_first_of("n") != string::npos ? true : false;
 
 #ifdef WINDOWS
         if(int_flag(arg[1], "P") != -1)
@@ -361,8 +366,8 @@ void print_usage()
     "    -Ln  Set compression level to n where n = 1, 2 or 3 (default = 1)\n"
     "    -r   Include sub directories during compression\n"
     "    -v   Show progress information during compression and decompression\n"
-	"    -i   Read from stdin (omit source file or file/dir search pattern)\n"
-	"    -o   Write to stdout (omit destination file or directory)\n"
+    "    -i   Read from stdin (omit source file or file/dir search pattern)\n"
+    "    -o   Write to stdout (omit destination file or directory)\n"
     "    -f   Overwrite existing files during compression and decompression (default\n"
     "         is to abort)\n"
     "    -C   Continue if a source file cannot be opened during compression (default\n"
@@ -372,11 +377,12 @@ void print_usage()
     "    -Kn  Read from disk in n KiB chunks during compression where n = " + str(AIO_MAX_SECTOR_SIZE >> 10) + " to\n" +
     "         " + str(MAX_COMPRESS_CHUNK_SIZE >> 10) + " (default = " + str(DEFAULT_COMPRESS_CHUNK_SIZE >> 10) + "). Be aware of memory usage with large n\n"
 	//  "================================================================================\n"
+    "    -n   Delete the input files\n"
     "    -B   Windows only: Disable file system caching (FILE_FLAG_NO_BUFFERING) to\n"
     "         prevent cache of other applications from being be flushed. Keep\n"
     "         enabled if files are small and need further processing\n"
     "    -Pn  Windows only: Set CPU and disk I/O priority to n where 1 = BACKGORUND\n"
-	"         (Vista, 7, 2008 only), 2 = IDLE, 3 = NORMAL or 4 = ABOVE (default = 3)\n\n"                                                         
+    "         (Vista, 7, 2008 only), 2 = IDLE, 3 = NORMAL or 4 = ABOVE (default = 3)\n\n"                                                         
     "Examples of compression:\n"
 #ifdef WINDOWS
     "    qpress -rv d:\\dir\\* database.qp\n"
@@ -1143,6 +1149,15 @@ int main(int argc, char* argv[])
 			{
 				if (!is_dir(arg[i]))
 					compress_file(arg[i], filenamepart(arg[i]));
+
+				if(delete_flag) {
+					if(unlink(arg[i].c_str())) {
+				 		PRINT(WARNING, "%sunlink %s error: %s\n", BLANK_LINE, arg[i].c_str(), strerror(errno));
+					} 
+					else {
+						PRINT(RESULT, "%sunlink %s ok\n", BLANK_LINE, arg[i].c_str());
+					}
+				}
 			}
 			
 			if(recursive_flag)
