@@ -19,4 +19,10 @@ Compressed 52,711,719 bytes in 1 file(s) into 29,606,487 bytes
 $ qpress -vnfL1K4096T4 st_test.ibd st_test.ibd.qp
     st_test.ibd     
 unlink st_test.ibd error: Permission denied
+
+## decompress
+# qpress -dnv st_test.ibd.qp ./
+    st_test.ibd
+ unlink st_test.ibd.qp ok                                   
+ Wrote 52,711,719 bytes in 1 file(s).
 ```
