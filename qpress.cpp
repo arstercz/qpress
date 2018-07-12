@@ -437,7 +437,15 @@ void print_usage()
 	exit(-1);
 }
 
-
+void delete_file(const char *filename)
+{
+    if(delete_flag) {
+        int rv = unlink(filename);
+        rv == 0
+            ? PRINT(RESULT, "%sunlink %s ok\n", BLANK_LINE, filename)
+            : PRINT(WARNING, "%sunlink %s error: %s\n", BLANK_LINE, filename, strerror(errno));
+    }
+}
 
 void try_aopen(const char *file, char mode)
 {
@@ -753,8 +761,8 @@ void decompress_file(string dest_file)
     for(i = 0; i < threads; i++)
         pthread_join(thread[i], &status);
 	  
-	if(dest_file != "<stdout>")
-		aclose_write();
+    if(dest_file != "<stdout>")
+        aclose_write();
 }
 
 void *compress_file_thread(void *arg)
@@ -838,6 +846,7 @@ void compress_file(string input_file, string filename)
 		try_awrite("ENDSENDS", 8);
 		fwrite64(bytes_written);
 		aclose_read(); // closes input_file
+		delete_file(input_file.c_str());
 	}
 	else if (continue_flag && input_file != "<stdin>")
 		PRINT(WARNING, "%s%s: Error opening source file '%s' - skipped\n", BLANK_LINE, "qpress", input_file.c_str());
@@ -1102,6 +1111,7 @@ int main(int argc, char* argv[])
         {
             string s = remove_delimitor(arg[2 + (!input_pipe)]);
             decompress_directory(s, false);
+            delete_file(arg[2].c_str());
         }
 
         aclose_read();
@@ -1150,14 +1160,6 @@ int main(int argc, char* argv[])
 				if (!is_dir(arg[i]))
 					compress_file(arg[i], filenamepart(arg[i]));
 
-				if(delete_flag) {
-					if(unlink(arg[i].c_str())) {
-				 		PRINT(WARNING, "%sunlink %s error: %s\n", BLANK_LINE, arg[i].c_str(), strerror(errno));
-					} 
-					else {
-						PRINT(RESULT, "%sunlink %s ok\n", BLANK_LINE, arg[i].c_str());
-					}
-				}
 			}
 			
 			if(recursive_flag)
